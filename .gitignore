@@ -1,0 +1,37 @@
+# Ignore compiled files
+*.o
+*.out
+*.a
+*.so
+*.exe
+*.bin
+
+# Ignore the binary executable
+game
+
+# Ignore object directory
+obj/
+
+# Ignore bin folder
+bin/
+
+# Ignore backup files
+*.bak
+
+# Ignore temporary files
+*~
+
+# Ignore logs
+*.log
+
+# Ignore IDE-specific files
+.vscode/
+.idea/
+
+# Ignore Makefile dependencies and cache
+Makefile.deps
+*.d
+
+# Ignore system files
+.DS_Store
+Thumbs.db
