@@ -18,7 +18,7 @@
 static void print_usage(const char *prog) {
   printf("Bomberman Client\n");
   printf("Usage: %s <server_ip> <player_name> [port]\n", prog);
-  printf("  server_ip    - Server IP address\n");
+  printf("  hostname     - Server hostname or IP adress\n");
   printf("  player_name  - Your player name (max 29 chars)\n");
   printf("  port         - Server port (default: %d)\n", DEFAULT_PORT);
 }
@@ -84,8 +84,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (!game.is_initialized) {
-      fprintf(stderr,
-              "Timeout: no WELCOME received within 30 seconds.\n");
+      fprintf(stderr, "Timeout: no WELCOME received within 30 seconds.\n");
       close(sock);
       return 1;
     }
@@ -157,8 +156,7 @@ int main(int argc, char *argv[]) {
       case ACTION_BOMB: {
         // Place bomb at our current position
         player_t *me = &game.players[game.my_player_id];
-        uint16_t cell =
-            make_cell_index(me->row, me->col, game.map_width);
+        uint16_t cell = make_cell_index(me->row, me->col, game.map_width);
         network_send_bomb_attempt(sock, game.my_player_id, cell);
       } break;
       case ACTION_QUIT:

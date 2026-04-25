@@ -3,6 +3,7 @@
 #include "state.h"
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -11,24 +12,49 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-int network_connect(const char *ip, int port) {
-  int sock = socket(AF_INET, SOCK_STREAM, 0);
-  if (sock < 0) {
+#include <stdio.h>
+
+int network_connect(const char *host, int port) {
+
+  struct addrinfo hints, *res;
+
+  char port_str[16];
+
+  snprintf(port_str, sizeof(port_str), "%d", port);
+
+  memset(&hints, 0, sizeof(hints));
+
+  hints.ai_family = AF_UNSPEC;
+
+  hints.ai_socktype = SOCK_STREAM;
+
+  if (getaddrinfo(host, port_str, &hints, &res) != 0) {
+    fprintf(stderr, "Network Error: DNS lookup failed for %s:%d\n", host, port);
     return -1;
   }
 
-  struct sockaddr_in server_addr = {0};
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(port);
+  int sock = -1;
+  struct addrinfo *p;
 
-  inet_pton(AF_INET, ip, &server_addr.sin_addr);
+  for (p = res; p != NULL; p = p->ai_next) {
+    sock = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+    if (sock < 0)
+      continue;
 
-  if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    if (connect(sock, p->ai_addr, p->ai_addrlen) == 0) {
+      break;
+    }
     close(sock);
+    sock = -1;
+  }
+
+  freeaddrinfo(res);
+
+  if (sock < 0) {
+    fprintf(stderr, "Network Error: Failed to connect to %s:%d\n", host, port);
     return -1;
   }
 
-  // Set as non blocking
   int flags = fcntl(sock, F_GETFL, 0);
   fcntl(sock, F_SETFL, flags | O_NONBLOCK);
 
@@ -387,7 +413,11 @@ NetworkEvent handle_network_updates(int sock, GameState *game) {
 
     if (buffer_len - i < packet_size)
       break;
-    process_single_packet(&net_buf[i], game, sock);
+    int result = process_single_packet(&net_buf[i], game, sock);
+
+    if (result == -1) {
+      return NETWORK_ERROR;
+    }
 
     i += packet_size;
   }
