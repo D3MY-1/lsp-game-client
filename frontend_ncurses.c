@@ -28,8 +28,16 @@ bool frontend_init(void) {
   init_pair(1, player_color[0], COLOR_WHITE);
 
   for (int i = 1; i < MAX_PLAYERS; i++) {
-    init_pair(i + 1, player_color[i], COLOR_BLACK);
+    init_pair((short)(i + 1), (short)player_color[i], COLOR_BLACK);
   }
+
+  // Tile color pairs (starting from 10 to avoid player conflicts)
+  init_pair(10, COLOR_RED, COLOR_BLACK);     // Explosion '*'
+  init_pair(11, COLOR_YELLOW, COLOR_BLACK);  // Bomb 'B'
+  init_pair(12, COLOR_WHITE, COLOR_WHITE);   // Hard wall 'H'
+  init_pair(13, COLOR_YELLOW, COLOR_WHITE);  // Soft wall 'S'
+  init_pair(14, COLOR_GREEN, COLOR_BLACK);   // Bonus items
+
   return true;
 }
 
@@ -66,7 +74,7 @@ typedef struct {
 
 static NcursesCtx ctx = {.map_win = NULL, .needs_reinit = true};
 
-static void recalculate_dimensions() {
+static void recalculate_dimensions(void) {
   getmaxyx(stdscr, ctx.screen_h, ctx.screen_w);
 
   ctx.view_h = ctx.screen_h - 6;
@@ -89,7 +97,82 @@ static void recalculate_dimensions() {
   ctx.needs_reinit = false;
 }
 
-void frontend_draw(const GameState *game) {
+static void draw_lobby(const GameState *game) {
+  if (ctx.needs_reinit || is_term_resized(ctx.screen_h, ctx.screen_w)) {
+    recalculate_dimensions();
+    erase();
+  }
+
+  werase(ctx.map_win);
+  box(ctx.map_win, 0, 0);
+
+  wattron(ctx.map_win, A_BOLD);
+  mvwprintw(ctx.map_win, 1, 2, "=== BOMBERMAN LOBBY ===");
+  wattroff(ctx.map_win, A_BOLD);
+
+  mvwprintw(ctx.map_win, 3, 2, "Server: %.20s", game->server_name);
+  mvwprintw(ctx.map_win, 4, 2, "Your ID: %d", game->my_player_id);
+
+  mvwprintw(ctx.map_win, 6, 2, "Players:");
+
+  int line = 7;
+  for (int i = 0; i < MAX_PLAYERS; i++) {
+    const player_t *p = &game->players[i];
+    if (!p->is_connected)
+      continue;
+
+    set_player_color(p);
+    mvwprintw(ctx.map_win, line, 4, "[%d] %-30s %s", i, p->name,
+              p->ready ? "[READY]" : "");
+    unset_player_color(p);
+    line++;
+  }
+
+  mvwprintw(ctx.map_win, line + 2, 2, "Press [R] to toggle ready");
+  mvwprintw(ctx.map_win, line + 3, 2, "Press [Q] to quit");
+
+  wnoutrefresh(stdscr);
+  wnoutrefresh(ctx.map_win);
+  doupdate();
+}
+
+static void draw_game_end(const GameState *game) {
+  if (ctx.needs_reinit || is_term_resized(ctx.screen_h, ctx.screen_w)) {
+    recalculate_dimensions();
+    erase();
+  }
+
+  werase(ctx.map_win);
+  box(ctx.map_win, 0, 0);
+
+  wattron(ctx.map_win, A_BOLD);
+  mvwprintw(ctx.map_win, 2, 2, "=== GAME OVER ===");
+  wattroff(ctx.map_win, A_BOLD);
+
+  if (game->winner_id < MAX_PLAYERS) {
+    const player_t *winner = &game->players[game->winner_id];
+    set_player_color(winner);
+    mvwprintw(ctx.map_win, 4, 2, "Winner: [%d] %s", game->winner_id,
+              winner->name);
+    unset_player_color(winner);
+
+    if (game->winner_id == game->my_player_id) {
+      wattron(ctx.map_win, A_BOLD | COLOR_PAIR(14));
+      mvwprintw(ctx.map_win, 6, 2, "*** YOU WON! ***");
+      wattroff(ctx.map_win, A_BOLD | COLOR_PAIR(14));
+    }
+  } else {
+    mvwprintw(ctx.map_win, 4, 2, "Result: DRAW");
+  }
+
+  mvwprintw(ctx.map_win, 9, 2, "Press [Q] to quit");
+
+  wnoutrefresh(stdscr);
+  wnoutrefresh(ctx.map_win);
+  doupdate();
+}
+
+static void draw_gameplay_screen(const GameState *game) {
 
   if (ctx.needs_reinit || is_term_resized(ctx.screen_h, ctx.screen_w)) {
     recalculate_dimensions();
@@ -124,8 +207,37 @@ void frontend_draw(const GameState *game) {
       int world_x = x + cam_x;
 
       if (world_y < game->map_height && world_x < game->map_width) {
-        char tile = game->map[world_y * game->map_width + world_x];
-        mvwaddch(ctx.map_win, y + 1, x + 1, tile);
+        uint8_t tile = game->map[world_y * game->map_width + world_x];
+
+        int color = 0;
+        switch (tile) {
+        case '*':
+          color = 10;
+          break; // explosion
+        case 'B':
+          color = 11;
+          break; // bomb
+        case 'H':
+          color = 12;
+          break; // hard wall
+        case 'S':
+          color = 13;
+          break; // soft wall
+        case 'A':
+        case 'R':
+        case 'T':
+        case 'N':
+          color = 14;
+          break; // bonuses
+        }
+
+        if (color) {
+          wattron(ctx.map_win, COLOR_PAIR(color));
+          mvwaddch(ctx.map_win, y + 1, x + 1, tile);
+          wattroff(ctx.map_win, COLOR_PAIR(color));
+        } else {
+          mvwaddch(ctx.map_win, y + 1, x + 1, tile);
+        }
       }
     }
   }
@@ -172,7 +284,7 @@ void frontend_draw(const GameState *game) {
   clrtoeol();
 
   // Print controls
-  mvprintw(ui_y, (ctx.screen_w / 2) - 15, "WASD: Move  Q: Quit");
+  mvprintw(ui_y, (ctx.screen_w / 2) - 15, "WASD: Move  Space: Bomb  Q: Quit");
 
   // Print Debug Data
   mvprintw(ui_y + 1, (ctx.screen_w / 2) - 15, "Player[%d, %d]  Camera[%d, %d]",
@@ -183,6 +295,20 @@ void frontend_draw(const GameState *game) {
   wnoutrefresh(stdscr);
   wnoutrefresh(ctx.map_win);
   doupdate();
+}
+
+void frontend_draw(const GameState *game) {
+  switch (game->status) {
+  case GAME_LOBBY:
+    draw_lobby(game);
+    break;
+  case GAME_RUNNING:
+    draw_gameplay_screen(game);
+    break;
+  case GAME_END:
+    draw_game_end(game);
+    break;
+  }
 }
 
 void frontend_cleanup(void) {
@@ -217,6 +343,12 @@ GameAction frontend_handle_input(void) {
     case 'd':
       action = ACTION_RIGHT;
       break;
+    case ' ':
+      action = ACTION_BOMB;
+      break;
+    case 'r':
+      action = ACTION_READY;
+      break;
     case 'q':
       return ACTION_QUIT;
     }
@@ -236,7 +368,7 @@ void frontend_sleep_until_next_frame(void) {
   long wait = 50 - elapsed;
 
   if (wait > 0) {
-    napms(wait);
+    napms((int)wait);
   }
 
   clock_gettime(CLOCK_MONOTONIC, &ts);
