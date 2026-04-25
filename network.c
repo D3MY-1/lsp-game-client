@@ -14,6 +14,8 @@
 
 #include <stdio.h>
 
+#include "log.h"
+
 int network_connect(const char *host, int port) {
 
   struct addrinfo hints, *res;
@@ -107,7 +109,8 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     if (lenght > MAX_PLAYERS) {
       game->status = 0;
 
-      // LOG INVALID PACKET
+      LOG_ERROR("Invalid WELCOME Packet with lenght %u", lenght);
+      // TODO : LOG INVALID PACKET
       return -1;
     }
 
@@ -126,10 +129,13 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
   case MSG_LEAVE: {
     uint8_t id = buffer[1];
 
-    if (id < MAX_PLAYERS) { // maybe we ignore some invalid packets and just log
-                            // them for now
+    if (id < MAX_PLAYERS) { // TODO : maybe we ignore some invalid packets and
+                            // just log
+                            // TODO : them for now
       game->players[id].is_connected = false;
       game->players[id].alive = false;
+    } else {
+      LOG_ERROR("Invalid LEAVE Packet with player_id %u", id);
     }
 
   } break;
@@ -150,7 +156,7 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     send(sock, packet, sizeof(packet), 0);
   } break; // it is handled outside of this function
   case MSG_PONG:
-    break; // rightnow do nothing
+    break; // TODO : rightnow do nothing
   case MSG_SET_STATUS: {
     game->status = buffer[payload];
   } break;
@@ -166,11 +172,15 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
 
     uint16_t location = ntohs(location_net);
     if (player_id >= MAX_PLAYERS) {
-      // log invalid player packet
+      LOG_ERROR("Invalid MOVED Packet with player_id %u", player_id);
+
+      // TODO : log invalid player packet
       return -1;
     }
     if (location >= (uint16_t)(game->map_width * game->map_height)) {
-      // log out of map packet
+      LOG_ERROR("Invalid MOVED Packet with location %u", location);
+
+      // TODO : log out of map packet
       return -1;
     }
     uint16_t row = location / game->map_width;
@@ -182,17 +192,23 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     uint8_t player_id = buffer[payload];
 
     if (player_id >= MAX_PLAYERS) {
-      // log invalid player packet
+      LOG_ERROR("Invalid DEATH Packet with player_id %u", player_id);
+
+      // TODO : log invalid player packet
       return -1;
     }
-    // log player death in chat
+
+    // TODO : log player death in chat
     game->players[player_id].alive = false;
   } break;
   case MSG_MAP: {
     uint8_t h = buffer[payload];
     uint8_t w = buffer[payload + 1];
     if (h * w > MAX_GRID_SIZE * MAX_GRID_SIZE) {
-      // log invalid map packet invalid size of {h * w}
+      // TODO : log invalid map packet invalid size of {h * w}
+      LOG_ERROR("Invalid MAP Packet with invalid map size: %u",
+                (uint16_t)h * (uint16_t)w);
+
       return -1;
     }
     game->map_width = w;
@@ -200,14 +216,17 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     memcpy(game->map, &buffer[payload + 2], h * w);
   } break;
   case MSG_BOMB: {
-    // not sure about this one right now i think we setup at the cell B as to
-    // bomb
+    // TODO : not sure about this one right now i think we setup at the cell B
+    // as to
+    // TODO : bomb
     (void)buffer[payload]; // owner id — unused for now
     uint16_t net_location;
     memcpy(&net_location, &buffer[payload + 1], sizeof(net_location));
     uint16_t location = ntohs(net_location);
     if (location >= (uint16_t)(game->map_width * game->map_height)) {
-      // LOG Out of map location
+      LOG_ERROR("Invalid BOMB Packet with invalid position: %u", location);
+
+      // TODO : LOG Out of map location
       return -1;
     }
     game->map[location] = 'B';
@@ -218,8 +237,12 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     memcpy(&location, &buffer[payload + 1], 2);
     location = ntohs(location);
 
-    if (location >= game->map_width * game->map_height)
+    if (location >= game->map_width * game->map_height) {
+      LOG_ERROR("Invalid EXPLOSION_START Packet with invalid position: %u",
+                location);
+
       return -1;
+    }
 
     int center_r = location / game->map_width;
     int center_c = location % game->map_width;
@@ -253,8 +276,12 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     memcpy(&location, &buffer[payload + 1], 2);
     location = ntohs(location);
 
-    if (location >= game->map_width * game->map_height)
+    if (location >= game->map_width * game->map_height) {
+      LOG_ERROR("Invalid EXPLOSION_END Packet with invalid position: %u",
+                location);
+
       return -1;
+    }
 
     int center_r = location / game->map_width;
     int center_c = location % game->map_width;
@@ -292,7 +319,10 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     uint16_t location = ntohs(net_location);
 
     if (location >= (uint16_t)(game->map_width * game->map_height)) {
-      // log location out of map
+      LOG_ERROR("Invalid BONUS_AVAILABLE Packet with invalid position: %u",
+                location);
+
+      // TODO : log location out of map
       return -1;
     }
     // Map bonus enum to map character: 1='A', 2='R', 3='T', 4='N'
@@ -310,10 +340,13 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     uint16_t location = ntohs(net_location);
 
     if (location >= (uint16_t)(game->map_width * game->map_height)) {
-      // log location out of map
+      LOG_ERROR("Invalid BONUS_RETRIEVED Packet with invalid position: %u",
+                location);
+
+      // TODO : log location out of map
       return -1;
     }
-    // check if player id is valid? or ignore
+    // TODO : check if player id is valid? or ignore
     game->map[location] = '.';
   } break;
   case MSG_BLOCK_DESTROYED: {
@@ -323,7 +356,10 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     uint16_t location = ntohs(net_location);
 
     if (location >= (uint16_t)(game->map_width * game->map_height)) {
-      // log location out of map
+      LOG_ERROR("Invalid BLOCK_DESTROYED Packet with invalid position: %u",
+                location);
+
+      // TODO : log location out of map
       return -1;
     }
     game->map[location] = '.';
@@ -362,7 +398,8 @@ NetworkEvent handle_network_updates(int sock, GameState *game) {
     } else if (msg_type == MSG_LEAVE)
       packet_size = 3;
     else if (msg_type == MSG_DISCONNECT)
-      return NETWORK_DISCONNECT; // here maybe we clean buffer and buff_len??
+      return NETWORK_DISCONNECT; // TODO : here maybe we clean buffer and
+                                 // buff_len??
     else if (msg_type == MSG_PING)
       packet_size = 3;
     else if (msg_type == MSG_PONG)
@@ -407,7 +444,9 @@ NetworkEvent handle_network_updates(int sock, GameState *game) {
       packet_size = 5;
 
     else {
-      // LOG recieved unknown packed {PACKET ID}
+      // TODO : LOG recieved unknown packed {PACKET ID}
+      LOG_ERROR("Unknown Packet Recieved with ID : %u", msg_type);
+
       return NETWORK_ERROR;
     }
 
@@ -433,6 +472,8 @@ NetworkEvent handle_network_updates(int sock, GameState *game) {
 
 void network_send_hello(int sock, const char *client_name,
                         const char *player_name) {
+
+  LOG_INFO("Send Hello Packet to %d", sock);
   uint8_t packet[53];
 
   packet[0] = MSG_HELLO;
@@ -447,6 +488,10 @@ void network_send_hello(int sock, const char *client_name,
 }
 
 void network_send_move_attempt(int sock, uint8_t my_id, char direction) {
+
+  LOG_INFO("Send Move Packet: %d PlayerID: %u Direction: %c", sock, my_id,
+           direction);
+
   uint8_t packet[4];
 
   packet[0] = MSG_MOVE_ATTEMPT;
@@ -459,6 +504,10 @@ void network_send_move_attempt(int sock, uint8_t my_id, char direction) {
 }
 
 void network_send_bomb_attempt(int sock, uint8_t my_id, uint16_t cell_index) {
+
+  LOG_INFO("Send BOMB_ATTEMPT Packet: %d PlayerID: %u Location: %u", sock,
+           my_id, cell_index);
+
   uint8_t packet[5];
 
   packet[0] = MSG_BOMB_ATTEMPT;
@@ -473,6 +522,9 @@ void network_send_bomb_attempt(int sock, uint8_t my_id, uint16_t cell_index) {
 }
 
 void network_send_ready(int sock, uint8_t my_id) {
+
+  LOG_INFO("Send READY Packet: %d PlayerID: %u", sock, my_id);
+
   uint8_t packet[3];
 
   packet[0] = MSG_SET_READY;

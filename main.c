@@ -12,6 +12,8 @@
 #include "network.h"
 #include "state.h"
 
+#include "log.h"
+
 #define CLIENT_NAME "PD_KD_Client/1.0"
 #define DEFAULT_PORT 25565
 
@@ -26,6 +28,11 @@ static void print_usage(const char *prog) {
 int main(int argc, char *argv[]) {
   if (argc < 3) {
     print_usage(argv[0]);
+    return 1;
+  }
+
+  if (log_init() == -1) {
+    fprintf(stderr, "Log initialization failed\n");
     return 1;
   }
 
@@ -203,6 +210,7 @@ int main(int argc, char *argv[]) {
   // Cleanup
   frontend_cleanup();
   network_close(sock);
+  log_close();
 
   return 0;
 }
