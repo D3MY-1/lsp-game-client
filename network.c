@@ -88,6 +88,17 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
   int payload = 3;
 
   switch (msg_type) {
+  case MSG_HELLO: {
+    // Server broadcasts HELLO when a new player joins the room.
+    // buffer[1] = sender_id (the new player's ID)
+    uint8_t id = buffer[1];
+    if (id < MAX_PLAYERS) {
+      game->players[id].is_connected = true;
+      game->players[id].alive = true;
+      // Player name starts at offset 23 in the HELLO payload (3 header + 20 client_name)
+      memcpy(game->players[id].name, &buffer[23], MAX_PLAYER_NAME);
+    }
+  } break;
   case MSG_ERROR: {
     // For now just ignore error messages from server
     // TODO: display error in chat/log
@@ -119,11 +130,18 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
       uint8_t id = buffer[client_offset];
       if (id < MAX_PLAYERS) {
         game->players[id].is_connected = true;
+        game->players[id].alive = true;
         game->players[id].ready = buffer[client_offset + 1];
         memcpy(game->players[id].name, &buffer[client_offset + 2],
                MAX_PLAYER_NAME);
       }
       client_offset += 32; // Each client struct is 32 bytes
+    }
+
+    // Mark ourselves as connected and alive too
+    if (game->my_player_id < MAX_PLAYERS) {
+      game->players[game->my_player_id].is_connected = true;
+      game->players[game->my_player_id].alive = true;
     }
   } break;
   case MSG_LEAVE: {
@@ -390,7 +408,9 @@ NetworkEvent handle_network_updates(int sock, GameState *game) {
     int packet_size = 0;
 
     int payload = i + 3;
-    if (msg_type == MSG_WELCOME) {
+    if (msg_type == MSG_HELLO)
+      packet_size = 53;
+    else if (msg_type == MSG_WELCOME) {
       if (buffer_len - i < 25)
         break;
       uint8_t lenght = net_buf[payload + 21];

@@ -32,11 +32,11 @@ bool frontend_init(void) {
   }
 
   // Tile color pairs (starting from 10 to avoid player conflicts)
-  init_pair(10, COLOR_RED, COLOR_BLACK);     // Explosion '*'
-  init_pair(11, COLOR_YELLOW, COLOR_BLACK);  // Bomb 'B'
-  init_pair(12, COLOR_WHITE, COLOR_WHITE);   // Hard wall 'H'
-  init_pair(13, COLOR_YELLOW, COLOR_WHITE);  // Soft wall 'S'
-  init_pair(14, COLOR_GREEN, COLOR_BLACK);   // Bonus items
+  init_pair(10, COLOR_RED, COLOR_BLACK);    // Explosion '*'
+  init_pair(11, COLOR_YELLOW, COLOR_BLACK); // Bomb 'B'
+  init_pair(12, COLOR_WHITE, COLOR_WHITE);  // Hard wall 'H'
+  init_pair(13, COLOR_YELLOW, COLOR_WHITE); // Soft wall 'S'
+  init_pair(14, COLOR_GREEN, COLOR_BLACK);  // Bonus items
 
   return true;
 }
@@ -182,9 +182,19 @@ static void draw_gameplay_screen(const GameState *game) {
   werase(ctx.map_win);
   box(ctx.map_win, 0, 0);
 
-  const player_t *me = &game->players[0];
-  int cam_y = me->row - (ctx.view_h / 2);
-  int cam_x = me->col - (ctx.view_w / 2);
+  // spectator mode check
+  const player_t *me = &game->players[game->my_player_id];
+  const player_t *cam_target = me;
+  bool spectating = false;
+
+  if (!me->alive && game->spectate_target < MAX_PLAYERS &&
+      game->players[game->spectate_target].alive) {
+    cam_target = &game->players[game->spectate_target];
+    spectating = true;
+  }
+
+  int cam_y = cam_target->row - (ctx.view_h / 2);
+  int cam_x = cam_target->col - (ctx.view_w / 2);
 
   if (cam_x < 0)
     cam_x = 0;
@@ -282,13 +292,27 @@ static void draw_gameplay_screen(const GameState *game) {
   clrtoeol();
   move(ui_y + 1, 0);
   clrtoeol();
+  move(ui_y + 2, 0);
+  clrtoeol();
 
-  // Print controls
-  mvprintw(ui_y, (ctx.screen_w / 2) - 15, "WASD: Move  Space: Bomb  Q: Quit");
+  if (spectating) {
+    // Spectator banner inside the map window
+    wattron(ctx.map_win, A_BOLD | A_REVERSE);
+    mvwprintw(ctx.map_win, 1, 2, " SPECTATING: %.20s [%d] ", cam_target->name,
+              game->spectate_target);
+    wattroff(ctx.map_win, A_BOLD | A_REVERSE);
+
+    // Controls
+    mvprintw(ui_y, (ctx.screen_w / 2) - 18, "A/D: Prev/Next Player  Q: Quit");
+    mvprintw(ui_y + 1, (ctx.screen_w / 2) - 18, "YOU ARE DEAD");
+  } else {
+    // Normal controls
+    mvprintw(ui_y, (ctx.screen_w / 2) - 15, "WASD: Move  Space: Bomb  Q: Quit");
+  }
 
   // Print Debug Data
-  mvprintw(ui_y + 1, (ctx.screen_w / 2) - 15, "Player[%d, %d]  Camera[%d, %d]",
-           me->col, me->row, cam_x, cam_y);
+  mvprintw(ui_y + 2, (ctx.screen_w / 2) - 15, "Player[%d, %d]  Camera[%d, %d]",
+           cam_target->col, cam_target->row, cam_x, cam_y);
 
   // 5. Draw UI Indicators and Refresh
 

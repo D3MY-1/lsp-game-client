@@ -8,7 +8,7 @@ OBJ_DIR   := obj
 FRONTEND ?= ncurses
 
 # Core logic files that are ALWAYS compiled
-CORE_SOURCES := main.c network.c
+CORE_SOURCES := main.c network.c log.c
 
 # The specific frontend file
 FE_SOURCE    := frontend_$(FRONTEND).c

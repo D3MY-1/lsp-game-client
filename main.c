@@ -146,31 +146,62 @@ int main(int argc, char *argv[]) {
     } break;
 
     case GAME_RUNNING: {
-      // In game: movement, bombs, and quit
-      switch (action) {
-      case ACTION_UP:
-        network_send_move_attempt(sock, game.my_player_id, 'U');
-        break;
-      case ACTION_DOWN:
-        network_send_move_attempt(sock, game.my_player_id, 'D');
-        break;
-      case ACTION_LEFT:
-        network_send_move_attempt(sock, game.my_player_id, 'L');
-        break;
-      case ACTION_RIGHT:
-        network_send_move_attempt(sock, game.my_player_id, 'R');
-        break;
-      case ACTION_BOMB: {
-        // Place bomb at our current position
-        player_t *me = &game.players[game.my_player_id];
-        uint16_t cell = make_cell_index(me->row, me->col, game.map_width);
-        network_send_bomb_attempt(sock, game.my_player_id, cell);
-      } break;
-      case ACTION_QUIT:
-        should_quit = true;
-        break;
-      default:
-        break;
+      player_t *me = &game.players[game.my_player_id];
+
+      if (me->alive) {
+        // Alive: normal gameplay controls
+        switch (action) {
+        case ACTION_UP:
+          network_send_move_attempt(sock, game.my_player_id, 'U');
+          break;
+        case ACTION_DOWN:
+          network_send_move_attempt(sock, game.my_player_id, 'D');
+          break;
+        case ACTION_LEFT:
+          network_send_move_attempt(sock, game.my_player_id, 'L');
+          break;
+        case ACTION_RIGHT:
+          network_send_move_attempt(sock, game.my_player_id, 'R');
+          break;
+        case ACTION_BOMB: {
+          uint16_t cell = make_cell_index(me->row, me->col, game.map_width);
+          network_send_bomb_attempt(sock, game.my_player_id, cell);
+        } break;
+        case ACTION_QUIT:
+          should_quit = true;
+          break;
+        default:
+          break;
+        }
+      } else {
+        // Dead: spectator mode — cycle through alive players
+        if (action == ACTION_QUIT) {
+          should_quit = true;
+        } else if (action == ACTION_RIGHT || action == ACTION_DOWN) {
+          // Next alive player
+          uint8_t start = game.spectate_target < MAX_PLAYERS
+                              ? game.spectate_target
+                              : 0;
+          for (int k = 1; k <= MAX_PLAYERS; k++) {
+            uint8_t idx = (start + k) % MAX_PLAYERS;
+            if (game.players[idx].alive && game.players[idx].is_connected) {
+              game.spectate_target = idx;
+              break;
+            }
+          }
+        } else if (action == ACTION_LEFT || action == ACTION_UP) {
+          // Previous alive player
+          uint8_t start = game.spectate_target < MAX_PLAYERS
+                              ? game.spectate_target
+                              : 0;
+          for (int k = 1; k <= MAX_PLAYERS; k++) {
+            uint8_t idx = (start - k + MAX_PLAYERS) % MAX_PLAYERS;
+            if (game.players[idx].alive && game.players[idx].is_connected) {
+              game.spectate_target = idx;
+              break;
+            }
+          }
+        }
       }
     } break;
 

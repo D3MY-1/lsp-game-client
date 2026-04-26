@@ -100,6 +100,8 @@ typedef struct {
   //
   uint8_t winner_id;
 
+  uint8_t spectate_target; // player ID to follow camera; 255 = follow self
+
 } GameState;
 
 void init_game_state(GameState *gama);
@@ -130,6 +132,7 @@ void init_game_state(GameState *game) {
   game->my_player_id = 255;
   game->is_initialized = false;
   game->winner_id = 255;
+  game->spectate_target = 255;
 }
 #endif
 
