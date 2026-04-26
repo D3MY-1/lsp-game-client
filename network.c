@@ -63,8 +63,8 @@ int network_connect(const char *host, int port) {
   return sock;
 }
 
-int network_close(int sock) {
-  uint8_t packet[3] = {MSG_LEAVE, 0, 255};
+int network_close(int sock, uint8_t my_id) {
+  uint8_t packet[3] = {MSG_LEAVE, my_id, 255};
 
   send(sock, packet, sizeof(packet), 0);
 
@@ -95,13 +95,22 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     if (id < MAX_PLAYERS) {
       game->players[id].is_connected = true;
       game->players[id].alive = true;
-      // Player name starts at offset 23 in the HELLO payload (3 header + 20 client_name)
+      // Player name starts at offset 23 in the HELLO payload (3 header + 20
+      // client_name)
       memcpy(game->players[id].name, &buffer[23], MAX_PLAYER_NAME);
     }
   } break;
   case MSG_ERROR: {
-    // For now just ignore error messages from server
-    // TODO: display error in chat/log
+    uint16_t err_len;
+    memcpy(&err_len, &buffer[payload], 2);
+    err_len = ntohs(err_len);
+    // Log the error string from the server
+    char err_msg[256];
+    int copy_len =
+        err_len < sizeof(err_msg) - 1 ? err_len : (int)sizeof(err_msg) - 1;
+    memcpy(err_msg, &buffer[payload + 2], (size_t)copy_len);
+    err_msg[copy_len] = '\0';
+    LOG_ERROR("Server ERROR: %s", err_msg);
   } break;
   case MSG_SET_READY: {
     uint8_t id = buffer[1]; // sender_id
@@ -351,7 +360,7 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
       game->map[location] = '?';
   } break;
   case MSG_BONUS_RETRIEVED: {
-    (void)buffer[payload]; // player id — unused for now
+    uint8_t retriever_id = buffer[payload];
 
     uint16_t net_location;
     memcpy(&net_location, &buffer[payload + 1], sizeof(net_location));
@@ -361,10 +370,23 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
       LOG_ERROR("Invalid BONUS_RETRIEVED Packet with invalid position: %u",
                 location);
 
-      // TODO : log location out of map
       return -1;
     }
-    // TODO : check if player id is valid? or ignore
+
+    if (retriever_id < MAX_PLAYERS) {
+      game->bonuses_collected[retriever_id]++;
+
+      uint8_t tile = game->map[location];
+      player_t *p = &game->players[retriever_id];
+      if (tile == 'A')
+        p->speed++;
+      else if (tile == 'R')
+        p->bomb_radius++;
+      else if (tile == 'T')
+        p->bomb_timer_ticks += 10;
+      else if (tile == 'N')
+        p->bomb_count++;
+    }
     game->map[location] = '.';
   } break;
   case MSG_BLOCK_DESTROYED: {
@@ -382,6 +404,7 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     }
     game->map[location] = '.';
   } break;
+
   default:
     return -1;
   }
@@ -550,6 +573,21 @@ void network_send_ready(int sock, uint8_t my_id) {
   packet[0] = MSG_SET_READY;
   packet[1] = my_id;
   packet[2] = 255;
+
+  send(sock, packet, sizeof(packet), 0);
+}
+
+void network_send_set_status(int sock, uint8_t my_id, uint8_t status) {
+
+  LOG_INFO("Send SET_STATUS Packet: %d PlayerID: %u Status: %u", sock, my_id,
+           status);
+
+  uint8_t packet[4];
+
+  packet[0] = MSG_SET_STATUS;
+  packet[1] = my_id;
+  packet[2] = 255;
+  packet[3] = status;
 
   send(sock, packet, sizeof(packet), 0);
 }

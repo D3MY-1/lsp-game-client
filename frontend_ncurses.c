@@ -165,7 +165,26 @@ static void draw_game_end(const GameState *game) {
     mvwprintw(ctx.map_win, 3, 2, "Result: DRAW");
   }
 
-  mvwprintw(ctx.map_win, 9, 2, "Press [Q] to quit");
+  // Statistics table
+  wattron(ctx.map_win, A_BOLD);
+  mvwprintw(ctx.map_win, 6, 2, "%-20s %7s", "Player", "Bonuses");
+  wattroff(ctx.map_win, A_BOLD);
+
+  int line = 7;
+  for (int i = 0; i < MAX_PLAYERS; i++) {
+    const player_t *p = &game->players[i];
+    if (!p->is_connected)
+      continue;
+
+    set_player_color(ctx.map_win, p);
+    mvwprintw(ctx.map_win, line, 2, "[%d] %-16s %7u", i, p->name,
+              game->bonuses_collected[i]);
+    unset_player_color(ctx.map_win, p);
+    line++;
+  }
+
+  mvwprintw(ctx.map_win, line + 2, 2, "Press [R] to return to lobby");
+  mvwprintw(ctx.map_win, line + 3, 2, "Press [Q] to quit");
 
   wnoutrefresh(stdscr);
   wnoutrefresh(ctx.map_win);
@@ -313,10 +332,12 @@ static void draw_gameplay_screen(const GameState *game) {
   }
 
   // Print Player Stats
-  mvprintw(ui_y + 2, (ctx.screen_w / 2) - 25, 
+  // TODO : Maybe have here later live tracker?
+
+  mvprintw(ui_y + 2, (ctx.screen_w / 2) - 25,
            "Bombs: %u | Radius: %u | Speed: %u | Timer: %u",
-           cam_target->bomb_count, cam_target->bomb_radius,
-           cam_target->speed, cam_target->bomb_timer_ticks);
+           cam_target->bomb_count, cam_target->bomb_radius, cam_target->speed,
+           cam_target->bomb_timer_ticks);
 
   // Print Debug Data
   mvprintw(ui_y + 3, (ctx.screen_w / 2) - 25, "Player[%d, %d]  Camera[%d, %d]",

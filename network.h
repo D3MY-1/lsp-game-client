@@ -14,7 +14,7 @@ typedef enum {
 
 int network_connect(const char *ip, int port);
 
-int network_close(int sock);
+int network_close(int sock, uint8_t my_id);
 
 NetworkEvent handle_network_updates(int sock, GameState *game);
 
@@ -26,5 +26,7 @@ void network_send_move_attempt(int socket_fd, uint8_t my_id, char direction);
 void network_send_bomb_attempt(int sock, uint8_t my_id, uint16_t cell_index);
 
 void network_send_ready(int sock, uint8_t my_id);
+
+void network_send_set_status(int sock, uint8_t my_id, uint8_t status);
 
 #endif

@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
   // Initialize ncurses frontend
   if (!frontend_init()) {
     fprintf(stderr, "Failed to initialize frontend (no color support?)\n");
-    network_close(sock);
+    network_close(sock, game.my_player_id);
     return 1;
   }
 
@@ -174,14 +174,13 @@ int main(int argc, char *argv[]) {
           break;
         }
       } else {
-        // Dead: spectator mode — cycle through alive players
+        // Dead: spectator mode - cycle through alive players
         if (action == ACTION_QUIT) {
           should_quit = true;
         } else if (action == ACTION_RIGHT || action == ACTION_DOWN) {
           // Next alive player
-          uint8_t start = game.spectate_target < MAX_PLAYERS
-                              ? game.spectate_target
-                              : 0;
+          uint8_t start =
+              game.spectate_target < MAX_PLAYERS ? game.spectate_target : 0;
           for (int k = 1; k <= MAX_PLAYERS; k++) {
             uint8_t idx = (start + k) % MAX_PLAYERS;
             if (game.players[idx].alive && game.players[idx].is_connected) {
@@ -191,9 +190,8 @@ int main(int argc, char *argv[]) {
           }
         } else if (action == ACTION_LEFT || action == ACTION_UP) {
           // Previous alive player
-          uint8_t start = game.spectate_target < MAX_PLAYERS
-                              ? game.spectate_target
-                              : 0;
+          uint8_t start =
+              game.spectate_target < MAX_PLAYERS ? game.spectate_target : 0;
           for (int k = 1; k <= MAX_PLAYERS; k++) {
             uint8_t idx = (start - k + MAX_PLAYERS) % MAX_PLAYERS;
             if (game.players[idx].alive && game.players[idx].is_connected) {
@@ -208,6 +206,10 @@ int main(int argc, char *argv[]) {
     case GAME_END: {
       // In end screen: quit or go back to lobby
       switch (action) {
+      case ACTION_READY:
+        // Send SET_STATUS(0) to return to lobby
+        network_send_set_status(sock, game.my_player_id, 0);
+        break;
       case ACTION_QUIT:
         should_quit = true;
         break;
@@ -240,7 +242,7 @@ int main(int argc, char *argv[]) {
 
   // Cleanup
   frontend_cleanup();
-  network_close(sock);
+  network_close(sock, game.my_player_id);
   log_close();
 
   return 0;

@@ -102,6 +102,9 @@ typedef struct {
 
   uint8_t spectate_target; // player ID to follow camera; 255 = follow self
 
+  // Per-player statistics
+  uint16_t bonuses_collected[MAX_PLAYERS];
+
 } GameState;
 
 void init_game_state(GameState *gama);
@@ -122,17 +125,18 @@ void init_game_state(GameState *game) {
     player->id = (uint8_t)i;
     player->is_connected = false;
     memset(player->name, '\0', sizeof(player->name));
-    player->bomb_count = 0;
-    player->bomb_radius = 0;
-    player->bomb_timer_ticks = 0;
+    player->bomb_count = 1;         // spec: starts with 1 bomb
+    player->bomb_radius = 1;        // spec: radius 1
+    player->bomb_timer_ticks = 60;  // spec: 3 seconds = 60 ticks
     player->ready = false;
-    player->speed = 0;
+    player->speed = 4;              // spec: 4 cells/second
   }
   memset(game->server_name, '\0', sizeof(game->server_name));
   game->my_player_id = 255;
   game->is_initialized = false;
   game->winner_id = 255;
   game->spectate_target = 255;
+  memset(game->bonuses_collected, 0, sizeof(game->bonuses_collected));
 }
 #endif
 
