@@ -45,9 +45,9 @@ int get_player_color_pair_id(int player_id) { return player_id + 1; }
 
 char player_symbols[MAX_PLAYERS] = {'1', '2', '3', '4', '5', '6', '7', '8'};
 
-#define set_player_color(p) attron(COLOR_PAIR((p)->id + 1))
+#define set_player_color(win, p) wattron((win), COLOR_PAIR((p)->id + 1))
 
-#define unset_player_color(p) attroff(COLOR_PAIR((p)->id + 1))
+#define unset_player_color(win, p) wattroff((win), COLOR_PAIR((p)->id + 1))
 
 void draw_gameplay(const GameState *game) {
 
@@ -58,9 +58,9 @@ void draw_gameplay(const GameState *game) {
       continue;
     }
 
-    set_player_color(player);
+    set_player_color(stdscr, player);
     mvaddch(game->players[i].row, game->players[i].col, player_symbols[i]);
-    unset_player_color(player);
+    unset_player_color(stdscr, player);
   }
   mvprintw(game->map_height, 0, "P1: WASD q: quit");
 }
@@ -121,10 +121,10 @@ static void draw_lobby(const GameState *game) {
     if (!p->is_connected)
       continue;
 
-    set_player_color(p);
+    set_player_color(ctx.map_win, p);
     mvwprintw(ctx.map_win, line, 4, "[%d] %-30s %s", i, p->name,
               p->ready ? "[READY]" : "");
-    unset_player_color(p);
+    unset_player_color(ctx.map_win, p);
     line++;
   }
 
@@ -146,23 +146,23 @@ static void draw_game_end(const GameState *game) {
   box(ctx.map_win, 0, 0);
 
   wattron(ctx.map_win, A_BOLD);
-  mvwprintw(ctx.map_win, 2, 2, "=== GAME OVER ===");
+  mvwprintw(ctx.map_win, 1, 2, "=== GAME OVER ===");
   wattroff(ctx.map_win, A_BOLD);
 
   if (game->winner_id < MAX_PLAYERS) {
     const player_t *winner = &game->players[game->winner_id];
-    set_player_color(winner);
-    mvwprintw(ctx.map_win, 4, 2, "Winner: [%d] %s", game->winner_id,
+    set_player_color(ctx.map_win, winner);
+    mvwprintw(ctx.map_win, 3, 2, "Winner: [%d] %s", game->winner_id,
               winner->name);
-    unset_player_color(winner);
+    unset_player_color(ctx.map_win, winner);
 
     if (game->winner_id == game->my_player_id) {
       wattron(ctx.map_win, A_BOLD | COLOR_PAIR(14));
-      mvwprintw(ctx.map_win, 6, 2, "*** YOU WON! ***");
+      mvwprintw(ctx.map_win, 4, 2, "*** YOU WON! ***");
       wattroff(ctx.map_win, A_BOLD | COLOR_PAIR(14));
     }
   } else {
-    mvwprintw(ctx.map_win, 4, 2, "Result: DRAW");
+    mvwprintw(ctx.map_win, 3, 2, "Result: DRAW");
   }
 
   mvwprintw(ctx.map_win, 9, 2, "Press [Q] to quit");
@@ -265,9 +265,9 @@ static void draw_gameplay_screen(const GameState *game) {
       int rel_x = (p->col - cam_x) + 1;
       int rel_y = (p->row - cam_y) + 1;
 
-      set_player_color(p);
+      set_player_color(ctx.map_win, p);
       mvwaddch(ctx.map_win, rel_y, rel_x, player_symbols[i]);
-      unset_player_color(p);
+      unset_player_color(ctx.map_win, p);
     }
   }
 
@@ -294,6 +294,8 @@ static void draw_gameplay_screen(const GameState *game) {
   clrtoeol();
   move(ui_y + 2, 0);
   clrtoeol();
+  move(ui_y + 3, 0);
+  clrtoeol();
 
   if (spectating) {
     // Spectator banner inside the map window
@@ -310,8 +312,14 @@ static void draw_gameplay_screen(const GameState *game) {
     mvprintw(ui_y, (ctx.screen_w / 2) - 15, "WASD: Move  Space: Bomb  Q: Quit");
   }
 
+  // Print Player Stats
+  mvprintw(ui_y + 2, (ctx.screen_w / 2) - 25, 
+           "Bombs: %u | Radius: %u | Speed: %u | Timer: %u",
+           cam_target->bomb_count, cam_target->bomb_radius,
+           cam_target->speed, cam_target->bomb_timer_ticks);
+
   // Print Debug Data
-  mvprintw(ui_y + 2, (ctx.screen_w / 2) - 15, "Player[%d, %d]  Camera[%d, %d]",
+  mvprintw(ui_y + 3, (ctx.screen_w / 2) - 25, "Player[%d, %d]  Camera[%d, %d]",
            cam_target->col, cam_target->row, cam_x, cam_y);
 
   // 5. Draw UI Indicators and Refresh
