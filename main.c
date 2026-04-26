@@ -148,6 +148,18 @@ int main(int argc, char *argv[]) {
     case GAME_RUNNING: {
       player_t *me = &game.players[game.my_player_id];
 
+      // Auto-spectate logic: if dead and we don't have a valid alive target, pick the first alive player
+      if (!me->alive) {
+        if (game.spectate_target >= MAX_PLAYERS || !game.players[game.spectate_target].alive) {
+          for (int k = 0; k < MAX_PLAYERS; k++) {
+            if (game.players[k].alive && game.players[k].is_connected) {
+              game.spectate_target = k;
+              break;
+            }
+          }
+        }
+      }
+
       if (me->alive) {
         // Alive: normal gameplay controls
         switch (action) {
