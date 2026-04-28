@@ -6,8 +6,8 @@
 #include <stdio.h>
 
 static const int player_color[MAX_PLAYERS] = {
-    COLOR_BLACK,   COLOR_CYAN,  COLOR_BLUE,   COLOR_GREEN,
-    COLOR_MAGENTA, COLOR_WHITE, COLOR_YELLOW, COLOR_RED};
+    COLOR_CYAN,  COLOR_GREEN,   COLOR_YELLOW, COLOR_MAGENTA,
+    COLOR_WHITE, COLOR_BLUE,    COLOR_RED,    COLOR_BLACK};
 
 bool frontend_init(void) {
 
@@ -25,19 +25,18 @@ bool frontend_init(void) {
 
   start_color();
 
-  init_pair(1, player_color[0], COLOR_WHITE);
-
-  for (int player_id = 1; player_id < MAX_PLAYERS; player_id++) {
-    init_pair((short)(player_id + 1), (short)player_color[player_id],
-              COLOR_BLACK);
+  for (int player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+    // Player 7 is BLACK, so we give them a white background. Otherwise black background.
+    short bg_color = (player_color[player_id] == COLOR_BLACK) ? COLOR_WHITE : COLOR_BLACK;
+    init_pair((short)(player_id + 1), (short)player_color[player_id], bg_color);
   }
 
   // Tile color pairs (starting from 10 to avoid player conflicts)
-  init_pair(10, COLOR_RED, COLOR_BLACK);    // Explosion '*'
-  init_pair(11, COLOR_YELLOW, COLOR_BLACK); // Bomb 'B'
-  init_pair(12, COLOR_WHITE, COLOR_WHITE);  // Hard wall 'H'
-  init_pair(13, COLOR_YELLOW, COLOR_WHITE); // Soft wall 'S'
-  init_pair(14, COLOR_GREEN, COLOR_BLACK);  // Bonus items
+  init_pair(10, COLOR_RED, COLOR_BLACK);     // Explosion '*'
+  init_pair(11, COLOR_YELLOW, COLOR_BLACK);  // Bomb 'B'
+  init_pair(12, COLOR_WHITE, COLOR_WHITE);   // Hard wall 'H'
+  init_pair(13, COLOR_MAGENTA, COLOR_WHITE); // Soft wall 'S'
+  init_pair(14, COLOR_GREEN, COLOR_BLACK);   // Bonus items
 
   return true;
 }
@@ -294,9 +293,21 @@ static void draw_gameplay_screen(const GameState *game) {
       int rel_x = (p->col - cam_x) + 1;
       int rel_y = (p->row - cam_y) + 1;
 
+      if (player_id == game->my_player_id) {
+        wattron(ctx.map_win, A_BOLD | A_REVERSE);
+      } else {
+        wattron(ctx.map_win, A_BOLD);
+      }
       set_player_color(ctx.map_win, player_id);
+      
       mvwaddch(ctx.map_win, rel_y, rel_x, player_symbols[player_id]);
+      
       unset_player_color(ctx.map_win, player_id);
+      if (player_id == game->my_player_id) {
+        wattroff(ctx.map_win, A_BOLD | A_REVERSE);
+      } else {
+        wattroff(ctx.map_win, A_BOLD);
+      }
     }
   }
 
