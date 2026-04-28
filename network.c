@@ -92,7 +92,11 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     // Server broadcasts HELLO when a new player joins the room.
     // buffer[1] = sender_id (the new player's ID)
     uint8_t id = buffer[1];
+
     if (id < MAX_PLAYERS) {
+
+      init_player(&game->players[id]); // Reset previous player state
+
       game->players[id].is_connected = true;
       game->players[id].alive = true;
       // Player name starts at offset 23 in the HELLO payload (3 header + 20
@@ -189,8 +193,10 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     if (game->status == GAME_LOBBY && buffer[payload] == GAME_RUNNING) {
       for (int i = 0; i < MAX_PLAYERS; i++) {
         if (game->players[i].is_connected) {
-          game->players[i].alive = true;
+          reset_player(&game->players[i]);
+          // game->players[i].alive = true;
         }
+        // game->players[i].ready = false;
       }
     }
     game->status = buffer[payload];
@@ -240,7 +246,6 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     uint8_t h = buffer[payload];
     uint8_t w = buffer[payload + 1];
     if (h * w > MAX_GRID_SIZE * MAX_GRID_SIZE) {
-      // TODO : log invalid map packet invalid size of {h * w}
       LOG_ERROR("Invalid MAP Packet with invalid map size: %u",
                 (uint16_t)h * (uint16_t)w);
 
@@ -261,7 +266,6 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
     if (location >= (uint16_t)(game->map_width * game->map_height)) {
       LOG_ERROR("Invalid BOMB Packet with invalid position: %u", location);
 
-      // TODO : LOG Out of map location
       return -1;
     }
     game->map[location] = 'B';
