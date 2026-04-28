@@ -27,8 +27,9 @@ bool frontend_init(void) {
 
   init_pair(1, player_color[0], COLOR_WHITE);
 
-  for (int i = 1; i < MAX_PLAYERS; i++) {
-    init_pair((short)(i + 1), (short)player_color[i], COLOR_BLACK);
+  for (int player_id = 1; player_id < MAX_PLAYERS; player_id++) {
+    init_pair((short)(player_id + 1), (short)player_color[player_id],
+              COLOR_BLACK);
   }
 
   // Tile color pairs (starting from 10 to avoid player conflicts)
@@ -45,22 +46,23 @@ int get_player_color_pair_id(int player_id) { return player_id + 1; }
 
 char player_symbols[MAX_PLAYERS] = {'1', '2', '3', '4', '5', '6', '7', '8'};
 
-#define set_player_color(win, p) wattron((win), COLOR_PAIR((p)->id + 1))
+#define set_player_color(win, idx) wattron((win), COLOR_PAIR((idx) + 1))
 
-#define unset_player_color(win, p) wattroff((win), COLOR_PAIR((p)->id + 1))
+#define unset_player_color(win, idx) wattroff((win), COLOR_PAIR((idx) + 1))
 
 void draw_gameplay(const GameState *game) {
 
-  for (int i = 0; i < MAX_PLAYERS; i++) {
-    const player_t *player = &game->players[i];
+  for (int player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+    const player_t *player = &game->players[player_id];
 
     if (!player->alive) {
       continue;
     }
 
-    set_player_color(stdscr, player);
-    mvaddch(game->players[i].row, game->players[i].col, player_symbols[i]);
-    unset_player_color(stdscr, player);
+    set_player_color(stdscr, player_id);
+    mvaddch(game->players[player_id].row, game->players[player_id].col,
+            player_symbols[player_id]);
+    unset_player_color(stdscr, player_id);
   }
   mvprintw(game->map_height, 0, "P1: WASD q: quit");
 }
@@ -116,15 +118,15 @@ static void draw_lobby(const GameState *game) {
   mvwprintw(ctx.map_win, 6, 2, "Players:");
 
   int line = 7;
-  for (int i = 0; i < MAX_PLAYERS; i++) {
-    const player_t *p = &game->players[i];
+  for (int player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+    const player_t *p = &game->players[player_id];
     if (!p->is_connected)
       continue;
 
-    set_player_color(ctx.map_win, p);
-    mvwprintw(ctx.map_win, line, 4, "[%d] %-30s %s", i, p->name,
+    set_player_color(ctx.map_win, player_id);
+    mvwprintw(ctx.map_win, line, 4, "[%d] %-30s %s", player_id, p->name,
               p->ready ? "[READY]" : "");
-    unset_player_color(ctx.map_win, p);
+    unset_player_color(ctx.map_win, player_id);
     line++;
   }
 
@@ -151,10 +153,10 @@ static void draw_game_end(const GameState *game) {
 
   if (game->winner_id < MAX_PLAYERS) {
     const player_t *winner = &game->players[game->winner_id];
-    set_player_color(ctx.map_win, winner);
+    set_player_color(ctx.map_win, game->winner_id);
     mvwprintw(ctx.map_win, 3, 2, "Winner: [%d] %s", game->winner_id,
               winner->name);
-    unset_player_color(ctx.map_win, winner);
+    unset_player_color(ctx.map_win, game->winner_id);
 
     if (game->winner_id == game->my_player_id) {
       wattron(ctx.map_win, A_BOLD | COLOR_PAIR(14));
@@ -171,15 +173,15 @@ static void draw_game_end(const GameState *game) {
   wattroff(ctx.map_win, A_BOLD);
 
   int line = 7;
-  for (int i = 0; i < MAX_PLAYERS; i++) {
-    const player_t *p = &game->players[i];
+  for (int player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+    const player_t *p = &game->players[player_id];
     if (!p->is_connected)
       continue;
 
-    set_player_color(ctx.map_win, p);
-    mvwprintw(ctx.map_win, line, 2, "[%d] %-16s %7u", i, p->name,
-              game->bonuses_collected[i]);
-    unset_player_color(ctx.map_win, p);
+    set_player_color(ctx.map_win, player_id);
+    mvwprintw(ctx.map_win, line, 2, "[%d] %-16s %7u", player_id, p->name,
+              game->bonuses_collected[player_id]);
+    unset_player_color(ctx.map_win, player_id);
     line++;
   }
 
@@ -273,8 +275,8 @@ static void draw_gameplay_screen(const GameState *game) {
 
   // players
 
-  for (int i = 0; i < MAX_PLAYERS; i++) {
-    const player_t *p = &game->players[i];
+  for (int player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+    const player_t *p = &game->players[player_id];
 
     if (!p->alive) {
       continue;
@@ -284,9 +286,9 @@ static void draw_gameplay_screen(const GameState *game) {
       int rel_x = (p->col - cam_x) + 1;
       int rel_y = (p->row - cam_y) + 1;
 
-      set_player_color(ctx.map_win, p);
-      mvwaddch(ctx.map_win, rel_y, rel_x, player_symbols[i]);
-      unset_player_color(ctx.map_win, p);
+      set_player_color(ctx.map_win, player_id);
+      mvwaddch(ctx.map_win, rel_y, rel_x, player_symbols[player_id]);
+      unset_player_color(ctx.map_win, player_id);
     }
   }
 

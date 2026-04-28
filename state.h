@@ -57,7 +57,9 @@ typedef enum {
 } msg_type_t;
 
 typedef struct {
-  uint8_t id;
+
+  // useless
+  // uint8_t id;
   char name[MAX_PLAYER_NAME];
   uint16_t row;
   uint16_t col;
@@ -109,7 +111,36 @@ typedef struct {
 
 void init_game_state(GameState *gama);
 
+void init_player(player_t *player);
+
+// this touches stuff that is only changed in the game
+void reset_player(player_t *player);
+
 #ifdef STATE_IMPL
+
+void reset_player(player_t *player) {
+  player->alive = true;
+  player->bomb_count = 1;
+  player->bomb_radius = 1;
+  player->bomb_timer_ticks = 60;
+  player->ready = false;
+  player->speed = 4;
+}
+
+void init_player(player_t *player) {
+  player->alive = false;
+  player->col = 0;
+  player->row = 0;
+  // player->id = (uint8_t)i; unused
+  player->is_connected = false;
+  memset(player->name, '\0', sizeof(player->name));
+  player->bomb_count = 1;        // spec: starts with 1 bomb
+  player->bomb_radius = 1;       // spec: radius 1
+  player->bomb_timer_ticks = 60; // spec: 3 seconds = 60 ticks
+  player->ready = false;
+  player->speed = 4; // spec: 4 cells/second
+}
+
 void init_game_state(GameState *game) {
   game->status = GAME_LOBBY;
   game->map_width = 0;
@@ -117,19 +148,8 @@ void init_game_state(GameState *game) {
   memset(game->map, 0, sizeof(game->map));
 
   for (int i = 0; i < MAX_PLAYERS; i++) {
-    player_t *player = &game->players[i];
-
-    player->alive = false;
-    player->col = 0;
-    player->row = 0;
-    player->id = (uint8_t)i;
-    player->is_connected = false;
-    memset(player->name, '\0', sizeof(player->name));
-    player->bomb_count = 1;         // spec: starts with 1 bomb
-    player->bomb_radius = 1;        // spec: radius 1
-    player->bomb_timer_ticks = 60;  // spec: 3 seconds = 60 ticks
-    player->ready = false;
-    player->speed = 4;              // spec: 4 cells/second
+    init_player(&game->players[i]);
+    // game->players[i].id = i; // this is unwanted
   }
   memset(game->server_name, '\0', sizeof(game->server_name));
   game->my_player_id = 255;
