@@ -72,11 +72,13 @@ typedef struct {
   int screen_h, screen_w;
   int view_h, view_w;
   bool needs_reinit;
+  game_status_t last_status;
 } NcursesCtx;
 
-static NcursesCtx ctx = {.map_win = NULL, .needs_reinit = true};
+static NcursesCtx ctx = {
+    .map_win = NULL, .needs_reinit = true, .last_status = GAME_LOBBY};
 
-static void recalculate_dimensions(void) {
+static void recalculate_dimensions(int map_h, int map_w) {
   getmaxyx(stdscr, ctx.screen_h, ctx.screen_w);
 
   ctx.view_h = ctx.screen_h - 6;
@@ -86,6 +88,12 @@ static void recalculate_dimensions(void) {
     ctx.view_h = 25;
   if (ctx.view_w > 80)
     ctx.view_w = 80;
+
+  // Shrink view to fit map if map is smaller than viewport
+  if (map_h > 0 && ctx.view_h > map_h)
+    ctx.view_h = map_h;
+  if (map_w > 0 && ctx.view_w > map_w)
+    ctx.view_w = map_w;
 
   if (ctx.map_win) {
     delwin(ctx.map_win);
@@ -101,7 +109,7 @@ static void recalculate_dimensions(void) {
 
 static void draw_lobby(const GameState *game) {
   if (ctx.needs_reinit || is_term_resized(ctx.screen_h, ctx.screen_w)) {
-    recalculate_dimensions();
+    recalculate_dimensions(0, 0);
     erase();
   }
 
@@ -140,7 +148,7 @@ static void draw_lobby(const GameState *game) {
 
 static void draw_game_end(const GameState *game) {
   if (ctx.needs_reinit || is_term_resized(ctx.screen_h, ctx.screen_w)) {
-    recalculate_dimensions();
+    recalculate_dimensions(0, 0);
     erase();
   }
 
@@ -196,7 +204,7 @@ static void draw_game_end(const GameState *game) {
 static void draw_gameplay_screen(const GameState *game) {
 
   if (ctx.needs_reinit || is_term_resized(ctx.screen_h, ctx.screen_w)) {
-    recalculate_dimensions();
+    recalculate_dimensions(game->map_height, game->map_width);
     erase();
   }
 
@@ -319,15 +327,20 @@ static void draw_gameplay_screen(const GameState *game) {
   clrtoeol();
 
   if (spectating) {
-    // Spectator banner inside the map window
-    wattron(ctx.map_win, A_BOLD | A_REVERSE);
-    mvwprintw(ctx.map_win, 1, 2, " SPECTATING: %.20s [%d] ", cam_target->name,
-              game->spectate_target);
-    wattroff(ctx.map_win, A_BOLD | A_REVERSE);
+    if (ctx.view_w >= 30) {
+      // Spectator banner on the border when there's enough room
+      wattron(ctx.map_win, A_BOLD | A_REVERSE);
+      mvwprintw(ctx.map_win, 0, 2, " SPECTATING: %.20s [%d] ", cam_target->name,
+                game->spectate_target);
+      wattroff(ctx.map_win, A_BOLD | A_REVERSE);
+    } else {
+      // Fall back to HUD when window is too narrow
+      mvprintw(ui_y + 1, (ctx.screen_w / 2) - 18, "SPECTATING: %.20s [%d]",
+               cam_target->name, game->spectate_target);
+    }
 
     // Controls
     mvprintw(ui_y, (ctx.screen_w / 2) - 18, "A/D: Prev/Next Player  Q: Quit");
-    mvprintw(ui_y + 1, (ctx.screen_w / 2) - 18, "YOU ARE DEAD");
   } else {
     // Normal controls
     mvprintw(ui_y, (ctx.screen_w / 2) - 15, "WASD: Move  Space: Bomb  Q: Quit");
@@ -353,6 +366,12 @@ static void draw_gameplay_screen(const GameState *game) {
 }
 
 void frontend_draw(const GameState *game) {
+  // Force reinit when game state changes so window resizes properly
+  if (game->status != ctx.last_status) {
+    ctx.needs_reinit = true;
+    ctx.last_status = game->status;
+  }
+
   switch (game->status) {
   case GAME_LOBBY:
     draw_lobby(game);
