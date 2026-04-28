@@ -185,6 +185,14 @@ int process_single_packet(uint8_t *buffer, GameState *game, int sock) {
   case MSG_PONG:
     break; // TODO : rightnow do nothing
   case MSG_SET_STATUS: {
+
+    if (game->status == GAME_LOBBY && buffer[payload] == GAME_RUNNING) {
+      for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (game->players[i].is_connected) {
+          game->players[i].alive = true;
+        }
+      }
+    }
     game->status = buffer[payload];
   } break;
   case MSG_WINNER: {
