@@ -94,6 +94,11 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "Timeout: no WELCOME received within 30 seconds.\n");
       close(sock);
       return 1;
+    } else {
+      // set local player nickname
+      game.players[game.my_player_id].is_connected = true;
+      memcpy(game.players[game.my_player_id].name, player_name,
+             sizeof(game.players[game.my_player_id].name));
     }
   }
 
